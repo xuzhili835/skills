@@ -37,6 +37,14 @@ if git diff --cached --quiet; then
   echo "无变化，不需要提交"
 else
   git commit -m "sync: skills snapshot $(date +%F)"
-  git push
+  git push || {
+    if netstat -ano | grep "LISTENING" | grep -q ":7897"; then
+      echo "直连失败，走本地 7897 代理重推"
+      HTTPS_PROXY=http://127.0.0.1:7897 git push
+    else
+      echo "推送失败且无本地代理在跑，稍后手动 git push" >&2
+      exit 1
+    fi
+  }
   echo "已提交并推送"
 fi
