@@ -7,25 +7,19 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 SRC_SKILLS="$HOME/.zcode/skills"
-SRC_TASTE="D:/Desktop/skill-主源/skill-copy-taste"
 
 [ -d "$SRC_SKILLS" ] || { echo "找不到 $SRC_SKILLS"; exit 1; }
 
+# 2026-10-14 起无桌面主源（用户清理）：.zcode 镜像为唯一快照来源，sources 目录废止
 rm -rf skills sources
 cp -r "$SRC_SKILLS" skills
-mkdir -p sources
-if [ -d "$SRC_TASTE" ]; then
-  cp -r "$SRC_TASTE" sources/skill-copy-taste
-else
-  echo "提示：主源 $SRC_TASTE 不存在，跳过 sources 快照"
-fi
 
 # 剥离快照里的内嵌 .git（避免被当成 gitlink 导致内容为空）
-find skills sources -depth -name ".git" -exec rm -rf {} + 2>/dev/null || true
+find skills -depth -name ".git" -exec rm -rf {} + 2>/dev/null || true
 
 # 脱敏（只动仓库副本，本地原件不碰）
 if [ -f redact.sed ]; then
-  find skills sources -type f \( -name "*.md" -o -name "*.js" -o -name "*.py" \
+  find skills -type f \( -name "*.md" -o -name "*.js" -o -name "*.py" \
     -o -name "*.txt" -o -name "*.html" -o -name "*.json" \) \
     -exec sed -i -f redact.sed {} +
 else
