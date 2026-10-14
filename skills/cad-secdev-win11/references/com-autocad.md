@@ -14,6 +14,12 @@ import win32com.client
 acad = win32com.client.gencache.EnsureDispatch("AutoCAD.Application.25.1")
 ```
 - 通用经验（未在本机逐项验证）：升级 AutoCAD 后 gencache 缓存可能与新类型库不匹配，出现诡异类型错误时清 `%TEMP%\gen_py` 目录再连。
+- **补充（2026-10-14，DispatchEx 实例实测）**：`DispatchEx("AutoCAD.Application")` 起的新实例上 `app.Visible = False` 必报 `Property can not be set`，而 `Dispatch` 动态绑定下同一句却可用——动态绑定是否拒绝属性 put 与实例获取方式有关，不可凭"昨天 Dispatch 能跑"推断 DispatchEx 也行；修法不变，对现有实例包一层即可（保留 DispatchEx 的独立实例语义）：
+
+```python
+app = win32com.client.DispatchEx("AutoCAD.Application")   # 强制新实例
+app = win32com.client.gencache.EnsureDispatch(app)        # 转早期绑定
+```
 
 ## ⚠️ 易错 2：AutoCAD 忙时所有 COM 调用被拒
 
@@ -90,6 +96,16 @@ doc.SendCommand('_.ZOOM _Window %.4f,%.4f %.4f,%.4f ' % (x1, y1, x2, y2))
 ## ⚠️ 易错 8：PlotToFile 中文输出路径静默失败（B-rep3转2 线回写 2026-10-14）
 
 `doc.PlotToFile("D:\\带中文目录\\图.png")` **返回 True 但磁盘上没有文件**（AutoCAD 2023 实测）——中文输出路径不报错、直接不出图。正解：先输出到 ASCII 路径（如 `D:\plot_tmp.png`），再用 Python `shutil` 挪到中文位置。验证图配置可用 PublishToWeb PNG.pc3 + monochrome.ctb + acExtents。附带：被 CAD 占用的文件先 `tasklist` 确认 acad.exe 进程归属再清理，防误杀用户实例。
+
+## ⚠️ 易错 9：Plot.SetWindow 窗口出图报"输入无效"（B-rep3转2 线回写 2026-10-14）
+
+想局部放大出图（一张大图的某个视图吃满输出分辨率）：`layout.PlotType = 3`（acWindow）后 `doc.Plot.SetWindow(x1, y1, x2, y2)` 直接抛 com_error `-2145386493 输入无效`（AutoCAD 2023，坐标本身就是合法的左下/右上）。COM 窗口出图此路不通时，**改走几何裁剪**，效果等同且确定性：
+
+1. ezdxf `readfile` 开原件，遍历 modelspace，用 `ezdxf.bbox.extents([e], fast=True)` 取每实体包围盒（注意它收的是**集合**，单实体要包 `[e]`）；
+2. 只保留包围盒完整落在目标窗口内的实体（越界的长线一并删，否则 extents 会被撑出去），其余 `msp.delete_entity`；
+3. 另存 ASCII 副本 → 常规 acExtents 打印，白边用 PIL `ImageOps.invert(img).getbbox()` 自动裁。
+
+11 万实体裁剪约 1 分钟，裁后保留数须断言 >100（窗口坐标写错会裁出空图）。
 
 ## 通用工程规则
 
