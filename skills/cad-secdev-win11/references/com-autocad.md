@@ -1,0 +1,113 @@
+# pywin32 COM 操作 AutoCAD：稳定写法（AutoCAD 2026 实测）
+
+> 本机：AutoCAD 2026，ProgID `AutoCAD.Application.25.1`。其他版本 ProgID 主版本号随发行版变化，连不上时先用 `win32com.client.GetObject` 族或注册表确认，不要硬编码猜。
+> 通用工具：`scripts/com_retry.py`（重试装饰器 + 早期绑定连接）。
+
+## ⚠️ 易错 1：动态绑定下属性赋值失败
+
+- **现象**：`ent.Layer = "xxx"` 报 `Property can not be set`；读取却正常。
+- **根因**：win32com 动态绑定(IDispatch late binding)对 AutoCAD 属性 put 操作不可靠。
+- **处理**：一律用 `gencache.EnsureDispatch` 转早期绑定：
+
+```python
+import win32com.client
+acad = win32com.client.gencache.EnsureDispatch("AutoCAD.Application.25.1")
+```
+- 通用经验（未在本机逐项验证）：升级 AutoCAD 后 gencache 缓存可能与新类型库不匹配，出现诡异类型错误时清 `%TEMP%\gen_py` 目录再连。
+
+## ⚠️ 易错 2：AutoCAD 忙时所有 COM 调用被拒
+
+- **现象**：`com_error: (-2147418111, '呼叫被呼叫方拒绝', ...)`（RPC_E_CALL_REJECTED），时好时坏。
+- **根因**：AutoCAD 单线程 COM，界面忙（打开文件、重生成、弹窗）时拒绝调用。
+- **处理**：**每一个** COM 调用点都要有重试保护，用装饰器统一处理：
+
+```python
+from com_retry import com_retry
+
+@com_retry(times=60, interval=0.25)
+def add_circle(doc, x, y, r):
+    return doc.ModelSpace.AddCircle(APoint(x, y), r)
+```
+- 手写循环也可以，但要区分错误码：重试类（RPC_E_CALL_REJECTED -2147418111、RPC_E_SERVERCALL_RETRYLATER -2147417846）才重试，其他 com_error 直接抛。
+
+## ⚠️ 易错 3：新实体颜色被会话 CECOLOR 污染
+
+- **现象**：脚本画的标记实体颜色不对（如继承用户会话留下的红色）。
+- **处理**：画图前先归零，或逐实体显式设色，双保险：
+
+```python
+doc.SetVariable("CECOLOR", "256")   # ByLayer
+ent.Color = 1                        # 需要强调的实体再显式设 ACI 色号
+```
+
+## ⚠️ 易错 4：大图纸逐实体遍历（性能悬崖）
+
+- **现象**：清理/查找实体时遍历 `ModelSpace`（2.7 万实体）极慢，且期间频繁 RPC 被拒。
+- **处理**：批量操作用带 DXF 过滤器的选择集；按已知句柄取实体用 `HandleToObject`：
+
+```python
+# 批量删除某层残留实体（Select 模式 5 = acSelectionSetAll）
+ss = doc.SelectionSets.Add("tmp_clean")
+ss.Select(5, None, None, None, [(0, ["LINE"], ["引线目标标记"])])  # 过滤器三元组按版本确认
+ss.Erase()
+# 按句柄直取（来自 JSON 计划数据时）
+ent = doc.HandleToObject(handle_str)
+```
+- 选择集名会残留：创建前先按名删除旧选择集（try 删 except 过）。
+
+## ⚠️ 易错 5：多个 acad.exe 进程 / 文档索引漂移
+
+- **现象**：`GetActiveObject` 连上的不是目标实例；或关闭一个文档后 `Documents.Item(i)` 索引变化，导致关错/删错文档。
+- **根因**：ROT 只注册一个实例；COM 文档集合按索引动态重排。
+- **处理**：
+  - 不缓存索引，**循环重扫**直到目标文档不存在：
+
+```python
+while True:
+    hit = [d for d in doc_list_by_name(acad, "FSCC111352.dxf")]
+    if not hit:
+        break
+    hit[0].Close(False)   # 循环内重新解析名字，不持有旧引用
+```
+  - 多实例场景先让用户确认/关闭多余 acad.exe，再跑脚本。
+
+## ⚠️ 易错 6：ZoomWindow 参数挑剔
+
+- **现象**：`Application.ZoomWindow(p1, p2)` 对变体类型挑剔，且作用对象受"当前活动文档"影响，容易缩错窗口。
+- **处理**：用命令行方式，稳：
+
+```python
+doc.SendCommand('_.ZOOM _Window %.4f,%.4f %.4f,%.4f ' % (x1, y1, x2, y2))
+```
+- SendCommand 的通用注意（来自 autocad-automation 技能）：命令是**异步**的，发完不等于执行完，保存/导出前要留有余量或随后复核；命令用 `_.` 前缀降低界面语言影响。
+
+## ⚠️ 易错 7：保存与另存
+
+- 原文件只读时 Save/SaveAs 原路径会被拒绝访问 → **另存新路径**：`doc.SaveAs(out_path, 61)`，61 = ac2013_dxf（AutoCAD 2026 实测，可输出 2013 DXF）。
+- 修改用户原图前先另存副本；覆盖必须有明确授权。
+- SaveAs 之后 **handle 会重排**：任何"跑两次对比结果"的验收都不能按 handle 配对，用几何签名（类型+中心+尺寸，容差如 1.2）。
+
+## ⚠️ 易错 8：PlotToFile 中文输出路径静默失败（B-rep3转2 线回写 2026-10-14）
+
+`doc.PlotToFile("D:\\带中文目录\\图.png")` **返回 True 但磁盘上没有文件**（AutoCAD 2023 实测）——中文输出路径不报错、直接不出图。正解：先输出到 ASCII 路径（如 `D:\plot_tmp.png`），再用 Python `shutil` 挪到中文位置。验证图配置可用 PublishToWeb PNG.pc3 + monochrome.ctb + acExtents。附带：被 CAD 占用的文件先 `tasklist` 确认 acad.exe 进程归属再清理，防误杀用户实例。
+
+## 通用工程规则
+
+- COM 桌面会话**串行执行**，不要并行跑两个连 AutoCAD 的脚本。
+- 每个脚本 `try/finally` 里做清理（选择集、临时文档），失败时打印已完成的阶段。
+- 检查每个返回对象是否为 None、保存后确认文件存在且大小合理。
+- 验收必渲染：把目标区域导出 PNG 目视检查，不要只统计实体数。
+
+## 迁移到其他 COM 软件（SolidWorks / Office 等）
+
+AutoCAD 上验证过的模式大部分可平移，差异点如下：
+
+| 模式 | AutoCAD | 其他软件注意 |
+|---|---|---|
+| 早期绑定 | EnsureDispatch 解决属性赋值 | SolidWorks 同样适用 |
+| 忙重试 | RPC_E_CALL_REJECTED | 同类错误码通用 |
+| by-ref 参数 | 少见 | SolidWorks 长参数 API 必须 `VARIANT(pythoncom.VT_BYREF \| VT_I4, 0)` 包装；数组用 SAFEARRAY |
+| 单位 | 无单位数值（图纸自定） | SolidWorks API 统一米；Office 各有各的枚举 |
+| 串行 | 必须 | SolidWorks 同样必须（桌面 COM 会话） |
+
+SolidWorks 侧的完整已验证封装（连接、草图、装配、导出、审查）直接用 `solidworks-automation` 技能的 `scripts/sw_*.py`，不要重复造轮子。
