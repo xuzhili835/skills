@@ -126,6 +126,29 @@ ok = ctypes.windll.user32.PrintWindow(hwnd, hdc, 2)     # 2 = PW_RENDERFULLCONTE
 - 绘图区子窗枚举不可信："Intermediate D3D Window" 的 GetWindowRect 坐标可超出窗口实际宽（实测 2831 > 1560）——别按子窗裁剪；要局部放大就整窗截 + `SendCommand('_.ZOOM _W …')`（易错 6 的绕法）让目标内容充满绘图区。
 - 收尾杀进程：Git Bash 下 `taskkill /PID` 的 /PID 会被转成路径——用 `powershell Stop-Process -Id <pid> -Force`。
 
+## ⚠️ 易错 11：批量改色的三重坑——筛选器说谎、文档拒访、同名串图（B-rep3转2 线回写 2026-10-15）
+
+批量"把红色实体改回去"的场景，逐实体 COM 太慢（11 万实体×4 调用≈半小时），快路径全部有坑：
+
+- **SelectionSet.Select 的颜色筛选器会返回全集**：`ss.Select(5, [62], [1])`（全部+颜色=红）实测返回 113,934=全部实体，筛选拒绝生效但**不报错**——按它逐条改色会把整张图逐条"改"一遍（巨慢且账目全错）。**COM 侧的筛选结果不能当地面真值**。
+- **Documents.Item(i) 对部分文档拒访**：`Documents.Count=2` 但 `Item(2)` 恒抛 com_error（动态/早期绑定都一样），那一张图 COM 完全摸不到。
+- **同名文档按名匹配串图**：工具按"全路径或文件名"匹配已开文档——两个目录的同名 DXF 同时开着，染红/恢复会在两张图之间串门；状态文件只记一份账，结果一边清了另一边还红着，恢复工具却说"没有被染红的图元"。**铁律：测试时同一时间只开一张同名图。**
+
+**可靠终案 = SendCommand 一条 LISP + 文件回读**（`ssget "_X"` 是数据库级扫描，毫秒级、不经 COM 枚举）：
+
+```python
+LISP = ('(progn (setq ss (ssget "_X" (list (cons 62 1)))) '
+        '(setq n1 (if ss (sslength ss) 0)) '
+        '(if (> n1 0) (command "_.CHANGE" ss "" "_P" "_C" "_BYLAYER" "")) '
+        '(setq f (open "D:/tmp/red.txt" "w")) '   # ASCII 路径；中文路径 open 不可靠
+        '(write-line (itoa n1) f) (close f) (princ)) ')
+doc.Activate(); time.sleep(0.8)
+doc.SendCommand(LISP)      # 异步入队，轮询结果文件等它跑完
+```
+
+逐文档"数红→CHANGE ByLayer→再数→写结果文件"，数字从文件回读，绕开 COM 一切筛选/枚举。清色前先用 ezdxf 数**磁盘文件**的 `e.dxf.get('color',256)` 分布定"正确的还原终点"（本项目=全 256，故改 ByLayer 即完整还原）；磁盘文件自始未被 COM 改过，关文档选"不保存"即净。
+
+
 ## 通用工程规则
 
 - COM 桌面会话**串行执行**，不要并行跑两个连 AutoCAD 的脚本。
