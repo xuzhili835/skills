@@ -107,6 +107,25 @@ doc.SendCommand('_.ZOOM _Window %.4f,%.4f %.4f,%.4f ' % (x1, y1, x2, y2))
 
 11 万实体裁剪约 1 分钟，裁后保留数须断言 >100（窗口坐标写错会裁出空图）。
 
+## ⚠️ 易错 10：要"像从 CAD 里截的"界面图——PrintWindow 整窗截屏（B-rep3转2 线回写 2026-10-15）
+
+Plot/出图管线给的是白底、无界面的图；要黑底模型空间 + Ribbon/状态栏的"真 CAD 截图"观感，走窗口位图截取：
+
+```python
+import ctypes
+ctypes.windll.shcore.SetProcessDpiAwareness(2)          # 截屏前必设（物理像素），否则坐标全错
+ok = ctypes.windll.user32.PrintWindow(hwnd, hdc, 2)     # 2 = PW_RENDERFULLCONTENT
+```
+
+- **PrintWindow(…, 2) 抓窗口自身渲染位图：被其他窗口完全遮挡也能抓全**（DirectX 渲染的 AutoCAD 实测可抓）；**最小化不可抓**——无渲染表面，得黑帧/旧帧。"无头不打扰用户"的正确姿势 = 窗口摆屏幕角落 + 不抢焦点，用户拿别的窗口盖住它也不影响，但别最小化。
+- 不抢焦点显示：`win32gui.SetWindowPos(hwnd, 0, x, y, w, h, win32con.SWP_NOACTIVATE | win32con.SWP_NOZORDER)`——窗口可见但绝不夺前台（实测开档后 `GetForegroundWindow() != hwnd`）。
+- 用户可同时用自己的 CAD：`DispatchEx` 起的实例与用户实例完全隔离，互不干扰。
+- Visible put 不对称（接易错 1 的补充条目）：DispatchEx 实例上 `app.Visible = True` 的 put 是**允许**的（False 才被拒）——别因为设 False 报错就以为 True 也不行。
+- 位图回读链：GetWindowDC → CreateCompatibleDC → CreateCompatibleBitmap(w,h) → PrintWindow → PIL `Image.frombuffer("RGB", (w,h), bits, "raw", "BGRX", 0, 1)`；收尾 `mfc.DeleteDC()` / `save.DeleteDC()` / ReleaseDC / DeleteObject 一个不能少——漏 DeleteDC 曾让整轮截图全部未落盘（异常发生在 img.save 之前）。
+- 标题栏真实感：开**同名副本**（标题栏显示真实文件名而不是临时名），截屏前 `doc.Save()` 消掉未保存星号。
+- 绘图区子窗枚举不可信："Intermediate D3D Window" 的 GetWindowRect 坐标可超出窗口实际宽（实测 2831 > 1560）——别按子窗裁剪；要局部放大就整窗截 + `SendCommand('_.ZOOM _W …')`（易错 6 的绕法）让目标内容充满绘图区。
+- 收尾杀进程：Git Bash 下 `taskkill /PID` 的 /PID 会被转成路径——用 `powershell Stop-Process -Id <pid> -Force`。
+
 ## 通用工程规则
 
 - COM 桌面会话**串行执行**，不要并行跑两个连 AutoCAD 的脚本。
