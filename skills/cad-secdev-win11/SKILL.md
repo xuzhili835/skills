@@ -26,7 +26,7 @@ metadata: { "os": ["win32"], "requires": { "anyBins": ["python"], "pythonPackage
 - **他人路径**：`C:\Users\ASUS\...` 下的 autocad-automation / solidworks-automation 是队友机器的技能，本机没有——本技能自洽使用，"工具箱"缺位不影响红线表与 references 的效力。
 - **颗粒度边界**：`references/dxf-geometry.md` 的阈值与判据出自其图纸识别项目（LEADER/球标标注识别），**思路可借、数字不直接搬**——换项目先按"第一步永远是结构探查"重测自己的数据。
 - **定位**：本技能=红线速查+踩坑案例库，防"重复交学费"，**不约束实现路径**；与项目自身的工具链约定冲突时，以项目 README / 工作区 AGENTS.md 为准。
-- 本机已回写的追加坑：DXF 中文文字样式与 $EXTMIN 覆盖（见 dxf-geometry.md"ezdxf 使用注意"末两条）、PlotToFile 中文路径（见 com-autocad.md"易错 8"）。
+- 本机已回写的追加坑：DXF 中文文字样式与 $EXTMIN 覆盖（见 dxf-geometry.md"ezdxf 使用注意"末两条）、PlotToFile 中文路径（见 com-autocad.md"易错 8"）、OCC 剖视图切盒中心化/剖面线精度口径/细线视觉验收（见 dxf-geometry.md 末节，2026-10-16）。
 
 ## ⚠️ Win11 红线速查表
 
