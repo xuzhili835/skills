@@ -114,3 +114,11 @@ analyze → mark → render + 三查（闭合性/交叠/漏标）
 - 实体级保真复制用 `ezdxf.addons.importer.Importer(source_doc, target_doc)` + `import_modelspace()+finalize()`:颜色/线型/文字样式/块原样保留;同名块与样式按名合并——**同源文件的两个副本**(如原文件 vs 只改层的另存文件)几何一致,合并安全;异源文件慎用。Importer 会丢 DIMASSOC 并刷大量警告,`logging.getLogger("ezdxf").setLevel(logging.ERROR)` 静默。
 - 整图平移 = 逐实体 `e.transform(Matrix44.translate(dx,dy,dz))`;建图层是 `doc.layers.add(name, color=...)`(Modelspace 没有 add_layer)。
 - **验收对照图必须从交付产物生成**(另存文件+JSON),不要"按同样算法重画一遍"——重绘丢颜色/字体/线型,会被一眼打回"和原图差太多";且重绘版验收通过≠交付文件正确(旁路验收陷阱)。可视化技巧:内存副本里把目标图层 color 改 1(红),byLayer 实体自动显红,实体自带色保持原色(符合"移层不改实体数据"口径)。
+
+**跨文档导入 DIMENSION 会丢几何块(ezdxf 设计行为,2026-10-21 补,修正前节一条):**
+
+- 真实 AutoCAD 图纸的 DIMENSION **全都带** `*Dnn` 匿名几何块(可见图形就存在块里);前节"未渲染的 DIMENSION 没有匿名块"仅指 ezdxf 自建未 render 的情形。探针查引用要用 `e.dxf.get("geometry", "")`——`block_name` 是不存在的属性,`.get` 静默回默认值会造成"无匿名块"的误判(亲历)。
+- `Importer.import_modelspace()` 导入 DIMENSION 后 geometry 引用**全部变空**:`Dimension.copy()` 故意 `discard("geometry")`(ezdxf 源码注释:新副本不能与原件共享同一几何块),而 Importer 内部正是用 copy() 复制实体。后果:ezdxf 自己读回无恙,AutoCAD 打开报"无有效几何块"、弹修复或加载不出图(500+ 个坏 DIMENSION 实测)。
+- 正确姿势(整图平移复制场景):①几何块随行 `imp.import_blocks(块名列表)`;②平移前先给匿名块改名加后缀(`*D76`→`*D76R`,防与底图同名块冲突;`blocks.rename_block` 会同步 INSERT,但 DIMENSION.geometry 要手动改);③`Dimension.transform` 会连带平移几何块内容,不用手动搬块内实体;④DIMENSION 本体**不走 Importer**,手动 `e.copy()`→回填 `dxf.geometry`→`doc.entitydb.add(ne)`→`msp.add_entity(ne)`,其余实体照常 Importer。
+- **"ezdxf 打得开"≠"AutoCAD 打得开"**:出文件前必须 `doc.audit()` 断言 errors/fixes 双零,再查 msp 的 INSERT/DIMENSION 引用块是否都在 `doc.blocks`——写进生成器自检,不过拒绝出文件。
+- 文件大小突然"省了"也是丢料信号:实体数对但块定义 625→47,说明依赖没跟全(原图大量字节在未直接引用的块定义/样式表里)。
