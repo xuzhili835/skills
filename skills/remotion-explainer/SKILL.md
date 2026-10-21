@@ -97,7 +97,7 @@ description: 制作讲解/教学类动画视频（Remotion，硬上限 3 分钟�
 3. 音频用 `<Sequence from={audioStart} durationInFrames={audioFrames}><Audio src={staticFile(...)} /></Sequence>` 挂到时间轴；前导留白让标题先出现，尾留白避免切幕截断。
 4. 旁白改了必须重跑合成和 timing，再重渲；只改字幕不改音频会造成漂移。
 5. 渲染后 `ffprobe` 确认有 audio stream，抽一段做 `volumedetect`，确认不是静音/削波。
-6. 中文 Windows 可用 SAPI `Microsoft Huihui Desktop`；语速 +1 约 4 字/秒，适合技术讲解。英文缩写尽量写成中文词或拆开字母，避免 TTS 读成怪音。
+6. 中文 Windows 可用 SAPI `Microsoft Huihui Desktop`；语速 +1 约 4 字/秒，+2 适合信息密度较高的技术讲解（v5 起默认 +2）。英文缩写尽量写成中文词或拆开字母，避免 TTS 读成怪音。
 
 ## 二·七 先出稿，再实现（2026-10-21 定，硬闸门）
 
