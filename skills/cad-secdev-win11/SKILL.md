@@ -26,7 +26,7 @@ metadata: { "os": ["win32"], "requires": { "anyBins": ["python"], "pythonPackage
 - **他人路径**：`C:\Users\ASUS\...` 下的 autocad-automation / solidworks-automation 是队友机器的技能，本机没有——本技能自洽使用，"工具箱"缺位不影响红线表与 references 的效力。
 - **颗粒度边界**：`references/dxf-geometry.md` 的阈值与判据出自其图纸识别项目（LEADER/球标标注识别），**思路可借、数字不直接搬**——换项目先按"第一步永远是结构探查"重测自己的数据。
 - **定位**：本技能=红线速查+踩坑案例库，防"重复交学费"，**不约束实现路径**；与项目自身的工具链约定冲突时，以项目 README / 工作区 AGENTS.md 为准。
-- 本机已回写的追加坑：DXF 中文文字样式与 $EXTMIN 覆盖（见 dxf-geometry.md"ezdxf 使用注意"末两条）、PlotToFile 中文路径（见 com-autocad.md"易错 8"）、OCC 剖视图切盒中心化/剖面线精度口径/细线视觉验收（见 dxf-geometry.md 末节，2026-10-16）、ezdxf 造合成判例 API 坑/跨页缝合聚类判据/Importer 保真读改写/验收图必须从交付产物生成（见 dxf-geometry.md 末节，2026-10-20）、Importer 导 DIMENSION 丢 geometry 匿名块引用/DIMENSION 手动复制回填/出文件前 audit 自检（见 dxf-geometry.md 末节，2026-10-21）、剖切符号连续线+短茎块参照箭头、线条笔画字母/箭头、并查集 1mm 合并边界/尺度依赖、文字优先后矢量回退（A/T/W 拓扑字形、V 箭头、AA 阶梯 1mm 端点吸附+BFS 仅裁旁支）（见 dxf-geometry.md 末节，2026-10-21）。
+- 本机已回写的追加坑：DXF 中文文字样式与 $EXTMIN 覆盖（见 dxf-geometry.md"ezdxf 使用注意"末两条）、PlotToFile 中文路径（见 com-autocad.md"易错 8"）、OCC 剖视图切盒中心化/剖面线精度口径/细线视觉验收（见 dxf-geometry.md 末节，2026-10-16）、ezdxf 造合成判例 API 坑/跨页缝合聚类判据/Importer 保真读改写/验收图必须从交付产物生成（见 dxf-geometry.md 末节，2026-10-20）、Importer 导 DIMENSION 丢 geometry 匿名块引用/DIMENSION 手动复制回填/出文件前 audit 自检（见 dxf-geometry.md 末节，2026-10-21）、剖切符号连续线+短茎块参照箭头、线条笔画字母/箭头、并查集 1mm 合并边界/尺度依赖、文字优先后矢量回退（A/T/W 拓扑字形、V 箭头、AA 阶梯 1mm 端点吸附+BFS 仅裁旁支）（见 dxf-geometry.md 末节，2026-10-21）、ACI 替代色表 RGB 重复陷阱(ACI170=ACI5)/表格重复检出两形态去重/语义层过滤必须留档（见 dxf-geometry.md 末节，2026-10-22）。
 
 ## ⚠️ Win11 红线速查表
 
