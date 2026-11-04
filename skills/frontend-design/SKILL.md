@@ -50,6 +50,18 @@ Never fabricate data in a showcase. Boxes, counts, and stats on a landing page m
 
 Animate structure together with content, never before it. If a connecting line finishes drawing before the cards it links arrive, a fast scroll catches the seam. Generate connectors per element (::after with inherited transition-delay) so both appear in the same frame. Give page-level entrance-animation classes a unique prefix: a scoped animation class that shares a name with a global utility silently falls back to the global baseline when it finishes — content stuck permanently invisible, no error thrown. CSS keyframes plus IntersectionObserver plus inline SVG cover landing-page motion; skip animation libraries so the bundle stays lean and the motion stays yours.
 
+## The pointer is a signature surface too
+
+Nobody themes the cursor. That is exactly why doing it well reads as craft and doing it carelessly reads as a bug: a themed arrow on the page and the system arrow on one button looks broken. Treat the pointer as part of the visual identity — a fifth surface next to color, type, layout, and signature.
+
+Pick the material to match the design's world. Ink/brush for a heritage, archival or calligraphic direction; clean geometric for a technical one; a jewel for something luxurious. Search for a set instead of hand-drawing from zero (queries like "themed cursor set ink brush", "minimal arrow cursor pack", "Open Cursor Library" / Bibata / itch.io cursor packs), then check the license before shipping — many popular sets are GPL, so record the set, author, license, and the recolored derivative in an assets README. Recoloring to the brand accent is normal and worth it: an accent-colored hand pointer is the single highest-leverage pixel of theming on the page.
+
+Get the hot spot from the file, not from eyeballing. For `.cur`, bytes 10–11 hold x and y; then declare `cursor: url('/cursors/hand.png') 9 1, pointer` — the number pair is the hot spot, the trailing keyword is the fallback that saves you if the asset 404s. Ship two states minimum (default arrow, accent hand); add a third only where it carries meaning.
+
+Build one global layer and import it first, never scatter declarations. Baseline `*, *::before, *::after` with `!important` so nothing falls through to the OS cursor, then re-assert semantics on top: text fields and contenteditable back to `text`, disabled controls to `not-allowed`, drag surfaces (map canvas, sliders) to `grab`/`grabbing`. Keep native text and disabled cursors — usability outranks theming — and never let the cursor substitute for a hover affordance, since touch and keyboard users never see it.
+
+Mirror the framework instead of chasing symptoms. Grep the UI library's compiled CSS for every rule declaring `cursor:` and re-declare those same selectors in your layer; extractions that only look for `cursor` as a non-first property will miss a whole class of rules. Then ban `cursor` in component-scoped styles — the global layer already wins via `!important`, and two sources drift. Finally verify per page and per state with `getComputedStyle`: one missed selector shows up as the system arrow and undoes the whole effect.
+
 ## More on writing in design
 
 Words appear in a design for one reason: to make it easier to understand, and therefore easier to use. They are design material, not decoration. Bring the same intentionality to copy that you would bring to spacing and color. Before writing anything, ask what the design needs to say, and how it can best be said to help the person navigate the experience.
