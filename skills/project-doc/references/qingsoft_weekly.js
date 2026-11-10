@@ -125,6 +125,7 @@ function imageParas(imgPath) {
   const w = 460, h = Math.round(w * dim.h / dim.w);
   return [new Paragraph({
     alignment: AlignmentType.CENTER,
+    keepNext: true,   // 图随图注，防图注跨页成孤行
     spacing: { before: 100, after: 40 },
     children: [new ImageRun({ data: b, transformation: { width: w, height: h }, type: dim.type })],
   })];
@@ -200,6 +201,13 @@ async function main() {
     ["结论", "□有效　□无效　□待定　＋ 一句话原因"],
     ["下一步", "基于本次结果的下一个动作"],
   ], [14, 86]));
+
+  // OOXML 要求表格不能是 body 最后一个块，缺收尾段落时 WPS 会自动补一个并顶出空白尾页；
+  // 显式给一个 2pt 高的收尾段落，让它留在末页正文内
+  ch.push(new Paragraph({
+    spacing: { before: 0, after: 0, line: 40, lineRule: "exact" },
+    children: [new TextRun({ text: "", size: 2 })],
+  }));
 
   const docx = kit.doc(ch, { creator: data.name || "", docTitle: `${data.period}实训周报` });
   const n = await kit.save(docx, out);
